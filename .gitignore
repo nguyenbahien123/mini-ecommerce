@@ -1,0 +1,77 @@
+# ==========================================
+# 1. Java & Spring Boot
+# ==========================================
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.log
+hs_err_pid*
+
+# ==========================================
+# 2. Build Tools (Giữ lại dòng tương ứng với tool bạn dùng)
+# ==========================================
+# --- Maven ---
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+# Bỏ comment dòng dưới nếu không muốn push Maven Wrapper lên
+# .mvn/wrapper/maven-wrapper.jar
+
+# --- Gradle ---
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ==========================================
+# 3. IDE (IntelliJ IDEA)
+# ==========================================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# ==========================================
+# 4. OS (Windows & MacOS fallback)
+# ==========================================
+# Windows rác
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+
+# MacOS rác (Đề phòng có người khác dùng Mac pull code)
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ==========================================
+# 5. Microservices & Security (QUAN TRỌNG)
+# ==========================================
+# Môi trường và biến cục bộ
+.env
+.env.local
+.env.*.local
+
+# Thư mục lưu cấu hình local của Config Server (Nếu bạn lưu local)
+config-server/
+
+# Bỏ qua các file key/chứng chỉ bảo mật
+*.jks
+*.p12
+*.pem
+*.key

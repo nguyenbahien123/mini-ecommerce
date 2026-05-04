@@ -2,24 +2,17 @@ package vn.nbh.userservice.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToMany;
 import lombok.*;
 
-import java.util.Set;
-
-@Entity
 @Getter
 @Setter
-@AllArgsConstructor
-@NoArgsConstructor
 @Builder
-public class Role extends AuditModel {
-
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+public class Permission extends AuditModel {
     @Id
     private String name;
 
     private String description;
-
-    @ManyToMany
-    Set<Permission> permissions;
 }

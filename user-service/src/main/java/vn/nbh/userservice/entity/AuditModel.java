@@ -28,4 +28,6 @@ public abstract class AuditModel {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    private Boolean isActive = true;
 }

@@ -14,44 +14,57 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity // Kích hoạt tính năng Web Security cho ứng dụng
-@EnableMethodSecurity // Cho phép phân quyền dựa trên Annotation (như @PreAuthorize) ở tầng Service/Controller
+@EnableMethodSecurity // Cho phép phân quyền dựa trên Annotation (như @PreAuthorize) ở tầng
+                      // Service/Controller
 public class SecurityConfig {
 
     private CustomJwtDecoder customJwtDecoder;
 
-    // Danh sách các API "mở", ai cũng có thể truy cập mà không cần Token (Login, Register, Refresh...)
+    // Danh sách các API "mở", ai cũng có thể truy cập mà không cần Token (Login,
+    // Register, Refresh...)
     private final String[] PUBLIC_ENDPOINTS = {
-            "/api/v1/user/add", "/api/v1/auth/token", "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/introspect"
+            "/api/v1/user/add", "/api/v1/auth/token", "/api/v1/auth/refresh", "/api/v1/auth/logout",
+            "/api/v1/auth/introspect"
     };
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         // 1. Cấu hình phân quyền cho các Request
         httpSecurity.authorizeHttpRequests(request -> request
-                .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll() // Cho phép POST vào các endpoint công khai
+                .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll() // Cho phép POST vào các endpoint công
+                                                                                // khai
+                .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-resources", "/swagger-resources/**",
+                        "/configuration/ui", "/configuration/security", "/swagger-ui/**", "/swagger-ui.html",
+                        "/webjars/swagger-ui/**", "/swagger-ui/index.html")
+                .permitAll() // Cho phép Swagger UI
                 .anyRequest().authenticated()); // Tất cả các request khác đều phải xác thực (có Token)
 
         // 2. Cấu hình ứng dụng đóng vai trò là OAuth2 Resource Server
         httpSecurity.oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwtConfigurer -> jwtConfigurer
                         .decoder(customJwtDecoder) // Sử dụng bộ giải mã tùy chỉnh để check Blacklist
-                        .jwtAuthenticationConverter(jwtAuthenticationConverter())) // Chuyển đổi Claim từ JWT sang Authority trong Spring
+                        .jwtAuthenticationConverter(jwtAuthenticationConverter())) // Chuyển đổi Claim từ JWT sang
+                                                                                   // Authority trong Spring
                 .authenticationEntryPoint(new JwtAuthenticationEntryPoint())); // Xử lý lỗi khi xác thực thất bại
 
-        // 3. Tắt CSRF (vì chúng ta dùng JWT/Stateless, không dùng Session/Cookie nên không sợ tấn công CSRF)
+        // 3. Tắt CSRF (vì chúng ta dùng JWT/Stateless, không dùng Session/Cookie nên
+        // không sợ tấn công CSRF)
         httpSecurity.csrf(csrf -> csrf.disable());
 
         return httpSecurity.build();
     }
 
     /**
-     * Tùy chỉnh cách chuyển đổi từ JWT sang đối tượng Authentication của Spring Security.
-     * Mặc định Spring sẽ thêm tiền tố "SCOPE_", hàm này giúp bạn tùy chỉnh hoặc loại bỏ nó.
+     * Tùy chỉnh cách chuyển đổi từ JWT sang đối tượng Authentication của Spring
+     * Security.
+     * Mặc định Spring sẽ thêm tiền tố "SCOPE_", hàm này giúp bạn tùy chỉnh hoặc
+     * loại bỏ nó.
      */
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        // Loại bỏ tiền tố mặc định "SCOPE_" để khớp với logic "ROLE_" mà bạn tự viết trong Service
+        // Loại bỏ tiền tố mặc định "SCOPE_" để khớp với logic "ROLE_" mà bạn tự viết
+        // trong Service
         jwtGrantedAuthoritiesConverter.setAuthorityPrefix("");
 
         JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();

@@ -1,6 +1,8 @@
 package vn.nbh.userservice.controller;
 
 import com.nimbusds.jose.JOSEException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -25,10 +27,12 @@ import java.text.ParseException;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
+@Tag(name = "Authentication API", description = "API cho việc xác thực, cấp token, kiểm tra token và đăng xuất")
 public class AuthenticationController {
 
     AuthenticationService authenticationService;
 
+    @Operation(summary = "Đăng nhập", description = "Cấp phát Access Token và Refresh Token khi cung cấp email/mật khẩu đúng")
     @PostMapping("/token")
     ApiResponse<AuthenticationResponse> authenticate(@RequestBody AuthenticationRequest authenticationRequest) {
         var result = authenticationService.authenticate(authenticationRequest);
@@ -37,12 +41,14 @@ public class AuthenticationController {
                 .build();
     }
 
+    @Operation(summary = "Kiểm tra Token", description = "Xác minh xem Access Token còn hiệu lực và có hợp lệ không")
     @PostMapping("/introspect")
     ApiResponse<IntrospectResponse> introspect(@RequestBody IntrospectRequest introspectRequest) {
         var result = authenticationService.introspect(introspectRequest);
         return ApiResponse.<IntrospectResponse>builder().result(result).build();
     }
 
+    @Operation(summary = "Làm mới Token", description = "Dùng Refresh Token để lấy một Access Token mới")
     @PostMapping("/refresh")
     ApiResponse<AuthenticationResponse> refreshToken(@RequestBody RefreshRequest refreshRequest)
             throws ParseException, JOSEException {
@@ -50,6 +56,7 @@ public class AuthenticationController {
         return ApiResponse.<AuthenticationResponse>builder().result(result).build();
     }
 
+    @Operation(summary = "Đăng xuất", description = "Vô hiệu hóa Token hiện tại, đẩy Token vào Blacklist")
     @PostMapping("/logout")
     ApiResponse<Void> logout(@RequestBody LogoutRequest logoutRequest) throws ParseException, JOSEException {
         authenticationService.logout(logoutRequest);

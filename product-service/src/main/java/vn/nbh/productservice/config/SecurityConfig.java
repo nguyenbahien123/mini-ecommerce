@@ -31,6 +31,9 @@ public class SecurityConfig {
                 // Cho phép tất cả mọi người (kể cả khách vãng lai không có token) xem danh sách và chi tiết sản phẩm
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
+                .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-resources", "/swagger-resources/**"
+                        , "/configuration/ui", "/configuration/security", "/swagger-ui/**", "/swagger-ui.html",
+                        "/webjars/swagger-ui/**", "/swagger-ui/index.html").permitAll() // Cho phép Swagger UI
                 // Các thao tác khác (POST, PUT, DELETE) bắt buộc phải có Token hợp lệ
                 .anyRequest().authenticated());
 

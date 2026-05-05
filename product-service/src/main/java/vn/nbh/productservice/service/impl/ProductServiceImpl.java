@@ -1,9 +1,10 @@
-package vn.nbh.productservice.service.ProductServiceImpl;
+package vn.nbh.productservice.service.impl;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import vn.nbh.productservice.dto.request.ProductRequest;
 import vn.nbh.productservice.dto.response.PageDTO;
@@ -29,6 +30,8 @@ public class ProductServiceImpl implements ProductService {
 
 
     @Override
+    @Transactional // Thêm Transactional cho create
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse createProduct(ProductRequest productRequest) {
         if(productRepository.existsByName(productRequest.getName())){
             throw new AppException(ErrorCode.PRODUCT_ALREADY_EXISTS);
@@ -39,6 +42,7 @@ public class ProductServiceImpl implements ProductService {
         Product product = Product.builder()
                 .name(productRequest.getName())
                 .description(productRequest.getDescription())
+                .imageUrl(productRequest.getImageUrl())
                 .price(productRequest.getPrice())
                 .stockQuantity(productRequest.getStockQuantity())
                 .category(category)
@@ -52,24 +56,28 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
 
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGORY_NOT_FOUND));
 
         product.setName(request.getName());
         product.setDescription(request.getDescription());
+        product.setImageUrl(request.getImageUrl());
         product.setPrice(request.getPrice());
         product.setStockQuantity(request.getStockQuantity());
         product.setCategory(category);
+
 
         return mapToResponse(productRepository.save(product));
     }
 
     @Override
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
             throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
@@ -110,9 +118,11 @@ public class ProductServiceImpl implements ProductService {
                 .id(product.getId())
                 .name(product.getName())
                 .description(product.getDescription())
+                .imageUrl(product.getImageUrl())
                 .price(product.getPrice())
                 .stockQuantity(product.getStockQuantity())
                 .categoryId(product.getCategory().getId())
+                .categoryName(product.getCategory().getName())
                 .build();
     }
 }

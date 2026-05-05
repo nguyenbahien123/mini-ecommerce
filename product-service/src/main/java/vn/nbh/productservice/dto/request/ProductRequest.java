@@ -21,6 +21,8 @@ public class ProductRequest {
 
     private String description;
 
+    private String imageUrl;
+
     @NotNull(message = "INVALID_PRODUCT_DATA")
     @Min(value = 0, message = "INVALID_PRODUCT_DATA")
     private BigDecimal price;

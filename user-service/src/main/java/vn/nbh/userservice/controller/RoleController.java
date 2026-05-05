@@ -1,5 +1,7 @@
 package vn.nbh.userservice.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -19,9 +21,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
+@Tag(name = "Role API", description = "API cho việc quản lý vai trò (Role)")
 public class RoleController {
     RoleService roleService;
 
+    @Operation(summary = "Tạo vai trò mới", description = "Chỉ ADMIN mới có quyền tạo vai trò mới")
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/add")
     ApiResponse<RoleResponse> create(@RequestBody RoleRequest roleRequest) {
@@ -30,6 +34,7 @@ public class RoleController {
                 .build();
     }
 
+    @Operation(summary = "Cập nhật vai trò", description = "Chỉ ADMIN mới có quyền cập nhật vai trò")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     ApiResponse<List<RoleResponse>> getAll() {
@@ -38,6 +43,7 @@ public class RoleController {
                 .build();
     }
 
+    @Operation(summary = "Cập nhật vai trò", description = "Chỉ ADMIN mới có quyền cập nhật vai trò")
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{roleId}")
     ApiResponse<Void> delete(@PathVariable String roleId) {
@@ -45,6 +51,7 @@ public class RoleController {
         return ApiResponse.<Void>builder().build();
     }
 
+    @Operation(summary = "Cập nhật vai trò", description = "Chỉ ADMIN mới có quyền cập nhật vai trò")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/list")
     ApiResponse<RolePageResponse> findAll(@RequestParam(required = false) String keyword,

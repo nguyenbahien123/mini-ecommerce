@@ -1,6 +1,8 @@
 package vn.nbh.userservice.controller;
 
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -20,9 +22,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
+@Tag(name = "Permission API", description = "API cho việc quản lý quyền hạn (Permission)")
 public class PermissionController {
     PermissionService permissionService;
 
+    @Operation(summary = "Tạo quyền hạn mới", description = "Chỉ ADMIN mới có quyền tạo quyền hạn mới")
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/add")
     ApiResponse<PermissionResponse> create(@RequestBody PermissionRequest permissionRequest) {
@@ -31,6 +35,7 @@ public class PermissionController {
                 .build();
     }
 
+    @Operation(summary = "Cập nhật quyền hạn", description = "Chỉ ADMIN mới có quyền cập nhật quyền hạn")
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{permissionId}")
     ApiResponse<PermissionResponse> update(@PathVariable("permissionId") String permissionId
@@ -40,6 +45,7 @@ public class PermissionController {
                 .build();
     }
 
+    @Operation(summary = "Lấy danh sách tất cả quyền hạn", description = "Chỉ ADMIN mới có quyền xem danh sách tất cả quyền hạn")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     ApiResponse<List<PermissionResponse>> getAll() {
@@ -48,6 +54,7 @@ public class PermissionController {
                 .build();
     }
 
+    @Operation(summary = "Xóa quyền hạn", description = "Chỉ ADMIN mới có quyền xóa quyền hạn")
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{permissionId}")
     ApiResponse<Void> delete(@PathVariable String permissionId) {
@@ -55,6 +62,7 @@ public class PermissionController {
         return ApiResponse.<Void>builder().build();
     }
 
+    @Operation(summary = "Tìm kiếm và phân trang quyền hạn", description = "Chỉ ADMIN mới có quyền tìm kiếm và phân trang quyền hạn")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/list")
     ApiResponse<PermissionPageResponse> findAll(@RequestParam(required = false) String keyword,

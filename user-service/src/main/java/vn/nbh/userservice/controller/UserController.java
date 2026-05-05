@@ -1,6 +1,8 @@
 package vn.nbh.userservice.controller;
 
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +24,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
+@Tag(name = "User API", description = "API cho việc quản lý người dùng (User)")
 public class UserController {
     UserService userService;
 
+    @Operation(summary = "Tạo người dùng mới", description = "Tạo một người dùng mới với thông tin được cung cấp. Chỉ ADMIN mới có quyền tạo người dùng.")
     @PostMapping("/add")
     ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request){
         return ApiResponse.<UserResponse>builder()
@@ -32,6 +36,7 @@ public class UserController {
                 .build();
     }
 
+    @Operation(summary = "Lấy danh sách tất cả người dùng", description = "Trả về danh sách tất cả người dùng trong hệ thống. Chỉ ADMIN mới có quyền xem danh sách người dùng.")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     ApiResponse<List<UserResponse>> getAllUsers(){
@@ -40,6 +45,7 @@ public class UserController {
                 .build();
     }
 
+    @Operation(summary = "Tìm kiếm và phân trang người dùng", description = "Tìm kiếm người dùng theo từ khóa, sắp xếp và phân trang kết quả. Chỉ ADMIN mới có quyền thực hiện tìm kiếm.")
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/list")
     ApiResponse<UserPageResponse> findAll(@RequestParam(required = false) String keyword,
@@ -52,6 +58,7 @@ public class UserController {
     }
 
 
+    @Operation(summary = "Cập nhật thông tin người dùng", description = "Cập nhật thông tin của một người dùng cụ thể. Chỉ ADMIN mới có quyền cập nhật người dùng.")
     @PutMapping("/{userId}")
     ApiResponse<UserResponse> updateUser(@PathVariable Integer userId, @RequestBody UserUpdateRequest request){
         return ApiResponse.<UserResponse>builder()
@@ -59,6 +66,7 @@ public class UserController {
                 .build();
     }
 
+    @Operation(summary = "Xóa người dùng", description = "Xóa một người dùng cụ thể khỏi hệ thống. Chỉ ADMIN mới có quyền xóa người dùng.")
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{userId}")
     ApiResponse<String> deleteUser(@PathVariable Integer userId){

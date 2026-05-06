@@ -2,6 +2,7 @@ package vn.nbh.productservice.service.impl;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,6 +12,7 @@ import vn.nbh.productservice.dto.response.PageDTO;
 import vn.nbh.productservice.dto.response.ProductResponse;
 import vn.nbh.productservice.entity.Category;
 import vn.nbh.productservice.entity.Product;
+import vn.nbh.productservice.event.OrderCreatedEvent;
 import vn.nbh.productservice.exception.AppException;
 import vn.nbh.productservice.exception.ErrorCode;
 import vn.nbh.productservice.repository.CategoryRepository;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
@@ -111,6 +114,36 @@ public class ProductServiceImpl implements ProductService {
                 productPage.isLast(),
                 content
         );
+    }
+
+    @Override
+    @Transactional // BẮT BUỘC PHẢI CÓ ĐỂ KÍCH HOẠT OPTIMISTIC LOCKING VÀ ROLLBACK
+    public void deductInventory(List<OrderCreatedEvent.OrderItemEvent> items) {
+        log.info("Bắt đầu xử lý trừ kho...");
+
+        for (OrderCreatedEvent.OrderItemEvent item : items) {
+            // 1. Tìm sản phẩm
+            Product product = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+
+            // 2. Kiểm tra tồn kho
+            if (product.getStockQuantity() < item.getQuantity()) {
+                log.error("Sản phẩm ID {} không đủ hàng. Còn: {}, Yêu cầu: {}",
+                        product.getId(), product.getStockQuantity(), item.getQuantity());
+                throw new AppException(ErrorCode.INSUFFICIENT_STOCK);
+            }
+
+            // 3. Trừ đi số lượng
+            product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
+
+            // 4. Lưu lại
+            // NẾU có 2 luồng cùng update 1 lúc, dòng code này của luồng chạy chậm hơn sẽ
+            // ném ra lỗi ObjectOptimisticLockingFailureException.
+            // Ngay lập tức Transaction bị Rollback -> Kafka Consumer bên ngoài sẽ hứng lỗi và tự Retry!
+            productRepository.save(product);
+        }
+
+        log.info("Trừ kho hoàn tất tất cả sản phẩm!");
     }
 
     private ProductResponse mapToResponse(Product product){

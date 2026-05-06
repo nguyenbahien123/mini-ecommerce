@@ -12,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Category {
+public class Category extends AuditModel{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

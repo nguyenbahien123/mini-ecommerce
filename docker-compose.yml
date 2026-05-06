@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181" # Ánh xạ cổng 2181 của container ra máy thật (localhost)
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181 # Cổng để các client (như Kafka) kết nối vào Zookeeper
+      ZOOKEEPER_TICK_TIME: 2000 # Đơn vị thời gian cơ sở (đo bằng ms) dùng để tính toán các timeout, heartbeat trong Zookeeper
+      TZ: "Asia/Ho_Chi_Minh" # Thiết lập múi giờ Việt Nam
+    volumes:
+      - /etc/localtime:/etc/localtime:ro # Đồng bộ file thời gian từ máy thật (Linux/Mac)
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      - mini-ecommerce-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    ports:
+      - "9092:9092" # Ánh xạ cổng 9092 để Spring Boot chạy trên máy thật chọc vào được
+    environment:
+      KAFKA_BROKER_ID: 1 # ID định danh duy nhất của con Kafka này. Nếu chạy cụm (cluster) nhiều con thì mỗi con phải có 1 ID khác nhau.
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181 # Chỉ đường cho Kafka biết Zookeeper đang ở đâu (dùng tên container thay vì IP).
+
+      # [QUAN TRỌNG NHẤT]: Cấu hình mạng cho Kafka
+      # LISTENERS là nơi Kafka mở tai ra nghe ở MẠNG NỘI BỘ (trong nội bộ Docker). 0.0.0.0 nghĩa là lắng nghe mọi IP bên trong container.
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+
+      # ADVERTISED_LISTENERS là địa chỉ mà Kafka "quảng cáo" ra BÊN NGOÀI.
+      # Khi Spring Boot kết nối lần đầu, Kafka sẽ trả về cái địa chỉ này để Spring Boot dùng cho các lần gửi tin nhắn sau.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+
+      # Vì bạn đang chạy Kafka ở chế độ Single-node (chỉ 1 con Kafka duy nhất),
+      # bạn phải set thông số này = 1 để tránh lỗi khi Kafka cố gắng sao lưu dữ liệu quản lý offset sang các node không tồn tại.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # Tính năng "lười": Tự động tạo Topic nếu có ai đó gửi tin nhắn vào một Topic chưa hề tồn tại.
+      # (Trên Production người ta thường tắt cái này đi và bắt tạo thủ công cho an toàn).
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      TZ: "Asia/Ho_Chi_Minh" # Thiết lập múi giờ Việt Nam
+    depends_on:
+      - zookeeper # Bắt buộc phải chờ Zookeeper chạy lên xong rồi Kafka mới được phép chạy
+    networks:
+      - mini-ecommerce-network
+
+networks:
+  mini-ecommerce-network:
+    driver: bridge # Tạo một mạng LAN ảo để Zookeeper và Kafka tự do nói chuyện với nhau qua tên container

@@ -198,7 +198,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .issuer("nbh.vn") // Đơn vị phát hành
                 .expirationTime(new Date(Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli())) // Hết hạn sau 24h
                 .jwtID(UUID.randomUUID().toString()) // Tạo ID ngẫu nhiên cho token để quản lý Logout
-                .claim("scope", buildScope(user)) // Gán quyền (Roles & Permissions) vào token
+                .claim("scope", buildScope(user))// Gán quyền (Roles & Permissions) vào token
+                .claim("userId", user.getId())
                 .build();
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());
@@ -227,6 +228,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .expirationTime(new Date(Instant.now().plus(14, ChronoUnit.DAYS).toEpochMilli())) // Hết hạn sau 14 ngày
                 .jwtID(UUID.randomUUID().toString())
                 .claim("scope","") // Refresh Token không nên chứa quyền hạn (Security Best Practice)
+                .claim("userId", user.getId())
                 .build();
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());

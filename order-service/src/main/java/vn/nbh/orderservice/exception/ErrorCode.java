@@ -1,6 +1,7 @@
-package vn.nbh.productservice.exception;
+package vn.nbh.orderservice.exception;
 
 import lombok.Getter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
 @Getter
@@ -10,14 +11,12 @@ public enum ErrorCode {
     NOT_FOUND(1003, "Not Found", HttpStatusCode.valueOf(404)),
     INTERNAL_SERVER_ERROR(1004, "Internal Server Error", HttpStatusCode.valueOf(500)),
     INVALID_INPUT(1005, "Invalid Input", HttpStatusCode.valueOf(400)),
-    PRODUCT_NOT_FOUND(1006, "Product Not Found", HttpStatusCode.valueOf(404)),
-    PRODUCT_ALREADY_EXISTS(1007, "Product Already Exists", HttpStatusCode.valueOf(409)),
-    INVALID_PRODUCT_DATA(1008, "Invalid Product Data", HttpStatusCode.valueOf(400)),
-    DATABASE_ERROR(1009, "Database Error", HttpStatusCode.valueOf(500)),
-    EXTERNAL_SERVICE_ERROR(1010, "External Service Error", HttpStatusCode.valueOf(502)),
-    CATEGORY_NOT_FOUND(1011, "Category Not Found", HttpStatusCode.valueOf(404)),
-    CATEGORY_ALREADY_EXISTS( 1012, "Category Already Exists", HttpStatusCode.valueOf(409)),
-    INSUFFICIENT_STOCK(1013, "Insufficient Stock", HttpStatusCode.valueOf(400))
+    PAYMENT_FAILED(1006, "Payment Failed", HttpStatusCode.valueOf(402)),
+    OUT_OF_STOCK(1007, "Out of Stock", HttpStatusCode.valueOf(409)) ,
+    ORDER_ALREADY_CANCELLED(1008, "Order Already Cancelled", HttpStatusCode.valueOf(409)),
+    ORDER_NOT_FOUND(1009, "Đơn hàng không tồn tại", HttpStatus.NOT_FOUND),
+    PRODUCT_NOT_FOUND(1010, "Sản phẩm không tồn tại", HttpStatus.NOT_FOUND),
+    INSUFFICIENT_STOCK(1011, "Sản phẩm không đủ số lượng tồn kho", HttpStatus.BAD_REQUEST),
     ;
 
     private final int code;

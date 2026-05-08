@@ -1,18 +1,19 @@
 package vn.nbh.orderservice.event;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import lombok.*;
-
-import java.math.BigDecimal;
 import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderCreatedEvent {
+public class OrderCanceledEvent {
     private Long orderId;
+    private String reason;
     private List<OrderItemEvent> items;
-    private BigDecimal totalAmount;
 
     @Data
     @Builder

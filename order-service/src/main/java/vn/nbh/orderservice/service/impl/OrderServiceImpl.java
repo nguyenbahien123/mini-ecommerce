@@ -16,6 +16,7 @@ import vn.nbh.orderservice.dto.response.ProductResponse;
 import vn.nbh.orderservice.entity.Order;
 import vn.nbh.orderservice.entity.OrderDetail;
 import vn.nbh.orderservice.enums.OrderStatus;
+import vn.nbh.orderservice.event.OrderCanceledEvent;
 import vn.nbh.orderservice.event.OrderCreatedEvent;
 import vn.nbh.orderservice.exception.AppException;
 import vn.nbh.orderservice.exception.ErrorCode;
@@ -90,6 +91,7 @@ public class OrderServiceImpl implements OrderService {
         // 4. Sau khi lưu thành công, bắn Kafka để product-service trừ kho
         OrderCreatedEvent event = OrderCreatedEvent.builder()
                 .orderId(order.getOrderId())
+                .totalAmount(order.getTotalAmount())
                 .items(order.getOrderDetails().stream()
                         .map(d -> new OrderCreatedEvent.OrderItemEvent(d.getProductId(), d.getQuantity()))
                         .collect(Collectors.toList()))
@@ -100,6 +102,74 @@ public class OrderServiceImpl implements OrderService {
         log.info("Đã bắn event tạo đơn hàng {} vào Kafka", order.getOrderId());
 
         return mapToResponse(order);
+    }
+
+    // Bổ sung hàm này vào OrderServiceImpl
+    @Override
+    @Transactional
+    public void cancelOrder(Long orderId, String reason) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        // Chỉ Hủy nếu đơn hàng đang PENDING
+        if (order.getStatus() == OrderStatus.PENDING) {
+            order.setStatus(OrderStatus.CANCELLED);
+            // Nếu bạn có cột 'note' hoặc 'cancel_reason' trong bảng Orders thì lưu reason vào đây
+            orderRepository.save(order);
+            log.info("Đã HỦY đơn hàng ID: {}. Lý do: {}", orderId, reason);
+        } else {
+            log.warn("Không thể hủy đơn hàng ID: {} vì trạng thái hiện tại là: {}", orderId, order.getStatus());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void cancelOrderDueToPaymentFailure(Long orderId, String reason) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        // Chỉ xử lý nếu đơn hàng đang ở trạng thái PENDING
+        if (order.getStatus() == OrderStatus.PENDING) {
+            order.setStatus(OrderStatus.CANCELLED);
+            order = orderRepository.save(order);
+            log.info("Đã HỦY đơn hàng ID: {}. Lý do: {}", orderId, reason);
+
+            // BẮN EVENT CHUYỀN CHO PRODUCT SERVICE ĐỂ CỘNG KHO
+            OrderCanceledEvent canceledEvent = OrderCanceledEvent.builder()
+                    .orderId(order.getOrderId())
+                    .reason(reason)
+                    .items(order.getOrderDetails().stream().map(detail ->
+                            OrderCanceledEvent.OrderItemEvent.builder()
+                                    .productId(detail.getProductId())
+                                    .quantity(detail.getQuantity())
+                                    .build()
+                    ).collect(Collectors.toList()))
+                    .build();
+
+            kafkaTemplate.send("order-canceled-topic", String.valueOf(order.getOrderId()), canceledEvent);
+            log.info("Đã bắn tín hiệu order-canceled-topic cho Product Service để hoàn kho.");
+        } else {
+            log.warn("Bỏ qua yêu cầu hủy. Đơn hàng ID: {} đang ở trạng thái: {}", orderId, order.getStatus());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void confirmOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        // Chỉ cập nhật nếu đơn hàng đang ở trạng thái PENDING
+        if (order.getStatus() == OrderStatus.PENDING) {
+            order.setStatus(OrderStatus.CONFIRMED);
+            orderRepository.save(order);
+            log.info("Đã CẬP NHẬT đơn hàng ID: {} sang trạng thái CONFIRMED (Thanh toán thành công).", orderId);
+
+            // TODO: (Giai đoạn sau) Bắn Kafka báo cho Notification Service gửi Email
+
+        } else {
+            log.warn("Bỏ qua yêu cầu xác nhận. Đơn hàng ID: {} đang ở trạng thái: {}", orderId, order.getStatus());
+        }
     }
 
     // --- Các hàm tiện ích map dữ liệu ---

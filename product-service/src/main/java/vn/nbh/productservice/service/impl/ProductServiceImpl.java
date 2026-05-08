@@ -12,6 +12,7 @@ import vn.nbh.productservice.dto.response.PageDTO;
 import vn.nbh.productservice.dto.response.ProductResponse;
 import vn.nbh.productservice.entity.Category;
 import vn.nbh.productservice.entity.Product;
+import vn.nbh.productservice.event.OrderCanceledEvent;
 import vn.nbh.productservice.event.OrderCreatedEvent;
 import vn.nbh.productservice.exception.AppException;
 import vn.nbh.productservice.exception.ErrorCode;
@@ -144,6 +145,27 @@ public class ProductServiceImpl implements ProductService {
         }
 
         log.info("Trừ kho hoàn tất tất cả sản phẩm!");
+    }
+
+    @Override
+    @Transactional
+    public void restoreInventory(List<OrderCanceledEvent.OrderItemEvent> items) {
+        log.info("--- Bắt đầu giao dịch CỘNG KHO (Rollback) ---");
+
+        for (OrderCanceledEvent.OrderItemEvent item : items) {
+            Product product = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+
+            // Cộng lại số lượng tồn kho
+            product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+
+            // Lưu lại. Nhờ @Version, nếu lúc này đang có người mua hàng, hệ thống vẫn đảm bảo đúng số tồn kho.
+            productRepository.save(product);
+
+            log.info("Hoàn trả {} sản phẩm cho Product ID: {}", item.getQuantity(), product.getId());
+        }
+
+        log.info("--- Cộng kho thành công toàn bộ sản phẩm! ---");
     }
 
     private ProductResponse mapToResponse(Product product){

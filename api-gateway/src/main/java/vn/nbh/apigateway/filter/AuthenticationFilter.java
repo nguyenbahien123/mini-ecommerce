@@ -1,10 +1,13 @@
 package vn.nbh.apigateway.filter;
 
+import com.nimbusds.jwt.SignedJWT;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.HttpHeaders;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -18,7 +21,10 @@ import java.util.List;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class AuthenticationFilter implements GlobalFilter, Ordered {
+
+    private final ReactiveStringRedisTemplate redisTemplate;
 
     private final List<String> publicEndpoints = List.of(
             "/api/v1/auth/token",
@@ -26,7 +32,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",
             "/api/v1/users/add",
-            "/api/v1/payments/webhook/**"
+            "/api/v1/payments/webhook.*"
     );
 
     @Override
@@ -49,10 +55,33 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             return unauthenticatedResponse(exchange.getResponse());
         }
 
-        // 3. (Tùy chọn) Gateway có thể gọi sang User Service (Identity Service) để check xem Token có bị Blacklist không.
-        // Ở giai đoạn này, ta cứ tin tưởng là có Token thì cho đi tiếp. Xuống dưới các service con sẽ tự decode và kiểm tra kỹ hơn.
+        // Cắt bỏ chữ "Bearer " để lấy đúng chuỗi JWT
+        String token = authHeader.get(0).substring(7);
 
-        return chain.filter(exchange);
+        try {
+            // 3. Parse Token siêu tốc để lấy JWT ID (jti)
+            // Chú ý: Ở đây ta KHÔNG verify chữ ký (để tiết kiệm CPU cho Gateway).
+            // Ta chỉ bóc payload ra đọc JTI. Việc verify chữ ký là nhiệm vụ của Microservice phía sau.
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            String jti = signedJWT.getJWTClaimsSet().getJWTID();
+
+            // 4. Kiểm tra trong Redis xem Token này có nằm trong Blacklist (Logout) không?
+            // Dùng flatMap vì đây là cơ chế luồng Reactive không đồng bộ
+            return redisTemplate.hasKey(jti)
+                    .flatMap(isBlacklisted -> {
+                        if (Boolean.TRUE.equals(isBlacklisted)) {
+                            log.warn("CẢNH BÁO: Token ID {} đã bị LOGOUT nhưng vẫn cố truy cập vào {}", jti, path);
+                            return unauthenticatedResponse(exchange.getResponse());
+                        }
+
+                        // Token sạch (không có trong Redis), cho phép đi qua
+                        return chain.filter(exchange);
+                    });
+
+        } catch (Exception e) {
+            log.error("Lỗi parse JWT hoặc Token sai định dạng tại Gateway: {}", e.getMessage());
+            return unauthenticatedResponse(exchange.getResponse());
+        }
     }
 
     private boolean isPublicEndpoint(String path) {

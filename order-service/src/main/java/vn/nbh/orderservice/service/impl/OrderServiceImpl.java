@@ -1,6 +1,7 @@
 package vn.nbh.orderservice.service.impl;
 
 import feign.FeignException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,8 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    // Đặt tên instance phải khớp với tên trong file application.yml
+    @CircuitBreaker(name = "productClient", fallbackMethod = "fallbackGetProduct")
     public OrderResponse createOrder(OrderRequest request) {
         // 1. Khởi tạo Order trống
         Order order = Order.builder()
@@ -190,6 +193,15 @@ public class OrderServiceImpl implements OrderService {
         } else {
             log.warn("Bỏ qua yêu cầu xác nhận. Đơn hàng ID: {} đang ở trạng thái: {}", orderId, order.getStatus());
         }
+    }
+
+    // --- HÀM FALLBACK ---
+    // Hàm này sẽ tự động được chạy nếu Product Service bị sập hoặc quá 2 giây không phản hồi
+    public OrderResponse fallbackGetProduct(OrderRequest request, Exception ex) {
+        log.error("CẦU DAO ĐÃ NGẮT: Lỗi khi gọi Product Service. Không thể tạo đơn hàng. Chi tiết: {}", ex.getMessage());
+
+        // Trả ra một Exception có chủ đích để Gateway/Controller bắt được và báo về Frontend
+        throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
     }
 
     // --- Các hàm tiện ích map dữ liệu ---

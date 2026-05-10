@@ -3,6 +3,9 @@ package vn.nbh.productservice.service.impl;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -61,6 +64,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
+    @CachePut(value="productDetail", key="#id") // Cập nhật Cache sau khi update thành công
     public ProductResponse updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
@@ -75,24 +79,30 @@ public class ProductServiceImpl implements ProductService {
         product.setStockQuantity(request.getStockQuantity());
         product.setCategory(category);
 
-
+        log.info("Đã cập nhật Database và ghi đè Cache cho Product ID: {}", id);
         return mapToResponse(productRepository.save(product));
     }
 
     @Override
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
+    @CacheEvict(value="productDetail", key="#id") // Xóa Cache sau khi xóa thành công
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
             throw new AppException(ErrorCode.PRODUCT_NOT_FOUND);
         }
         productRepository.deleteById(id);
+        log.info("Đã xóa khỏi DB và quét sạch Cache của Product ID: {}", id);
     }
 
     @Override
+    @Cacheable(value="productDetail", key="#id") // Cache kết quả theo ID sản phẩm
     public ProductResponse getProductById(Long id) {
+        log.info("--- CACHE MISS: Đang truy vấn Database để lấy Product ID: {} ---", id);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+        // Đoạn log trên chỉ in ra khi Redis chưa có dữ liệu.
+        // Lần thứ 2 bạn gọi API này, dòng log sẽ biến mất vì Spring đã chặn lại ở tầng Redis!
         return mapToResponse(product);
     }
 
@@ -119,6 +129,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional // BẮT BUỘC PHẢI CÓ ĐỂ KÍCH HOẠT OPTIMISTIC LOCKING VÀ ROLLBACK
+    @CacheEvict(value = "productDetail", key = "#item.productId") // Xóa Cache ngay khi có thay đổi về tồn kho
     public void deductInventory(List<OrderCreatedEvent.OrderItemEvent> items) {
         log.info("Bắt đầu xử lý trừ kho...");
 
@@ -149,6 +160,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "productDetail", key = "#item.productId") // Xóa Cache ngay khi có thay đổi về tồn kho
     public void restoreInventory(List<OrderCanceledEvent.OrderItemEvent> items) {
         log.info("--- Bắt đầu giao dịch CỘNG KHO (Rollback) ---");
 

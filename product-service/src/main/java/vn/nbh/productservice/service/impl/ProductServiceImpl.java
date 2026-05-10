@@ -129,7 +129,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional // BẮT BUỘC PHẢI CÓ ĐỂ KÍCH HOẠT OPTIMISTIC LOCKING VÀ ROLLBACK
-    @CacheEvict(value = "productDetail", key = "#item.productId") // Xóa Cache ngay khi có thay đổi về tồn kho
+    @CacheEvict(value = "productDetail", allEntries = true) // Xóa Cache khi có thay đổi về tồn kho
     public void deductInventory(List<OrderCreatedEvent.OrderItemEvent> items) {
         log.info("Bắt đầu xử lý trừ kho...");
 
@@ -160,7 +160,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "productDetail", key = "#item.productId") // Xóa Cache ngay khi có thay đổi về tồn kho
+    @CacheEvict(value = "productDetail", allEntries = true) // Xóa Cache khi có thay đổi về tồn kho
     public void restoreInventory(List<OrderCanceledEvent.OrderItemEvent> items) {
         log.info("--- Bắt đầu giao dịch CỘNG KHO (Rollback) ---");
 

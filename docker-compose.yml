@@ -1,6 +1,14 @@
 version: "3.8"
 
 services:
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - mini-ecommerce-network
+    restart: unless-stopped
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     container_name: zookeeper

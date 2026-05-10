@@ -4,6 +4,7 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     container_name: zookeeper
+    restart: always
     ports:
       - "2181:2181" # Ánh xạ cổng 2181 của container ra máy thật (localhost)
     environment:
@@ -19,6 +20,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     container_name: kafka
+    restart: on-failure
     ports:
       - "9092:9092" # Ánh xạ cổng 9092 để Spring Boot chạy trên máy thật chọc vào được
     environment:
@@ -46,6 +48,14 @@ services:
     networks:
       - mini-ecommerce-network
 
+  redis:
+    image: redis:7-alpine # Dùng bản alpine cho nhẹ và ổn định
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mini-ecommerce-network
+    restart: unless-stopped # Tự động khởi động lại container nếu nó bị lỗi hoặc máy chủ khởi động lại
 networks:
   mini-ecommerce-network:
     driver: bridge # Tạo một mạng LAN ảo để Zookeeper và Kafka tự do nói chuyện với nhau qua tên container

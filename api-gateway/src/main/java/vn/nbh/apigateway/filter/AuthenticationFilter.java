@@ -25,8 +25,8 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/introspect",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",
-            "/api/v1/users/add"
-            "/api/v1/payments/webhook/**",
+            "/api/v1/users/add",
+            "/api/v1/payments/webhook/**"
     );
 
     @Override

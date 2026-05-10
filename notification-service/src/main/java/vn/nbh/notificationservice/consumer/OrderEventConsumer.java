@@ -11,6 +11,7 @@ import vn.nbh.notificationservice.client.UserClient;
 import vn.nbh.notificationservice.dto.request.BrevoEmailRequest;
 import vn.nbh.notificationservice.dto.response.OrderResponse;
 import vn.nbh.notificationservice.dto.response.UserResponse;
+import vn.nbh.notificationservice.event.OrderConfirmedEvent;
 import vn.nbh.notificationservice.event.PaymentSuccessEvent;
 
 import java.util.List;
@@ -18,7 +19,7 @@ import java.util.List;
 @Component
 @Slf4j
 @RequiredArgsConstructor
-public class PaymentEventConsumer {
+public class OrderEventConsumer {
 
     private final OrderClient orderClient;
     private final UserClient userClient;
@@ -36,6 +37,27 @@ public class PaymentEventConsumer {
     @KafkaListener(topics = "payment-success-topic", groupId = "notification-group")
     public void handlePaymentSuccess(PaymentSuccessEvent event) {
         log.info("Nhận tín hiệu Thanh toán thành công cho Đơn hàng ID: {}", event.getOrderId());
+
+        try {
+            // 1. Lấy thông tin Đơn hàng
+            OrderResponse order = orderClient.getOrderById(event.getOrderId()).getResult();
+
+            // 2. Lấy thông tin User (Lấy Email)
+            UserResponse user = userClient.getUserById(order.getUserId()).getResult();
+
+            // 3. Gửi Email thông qua Brevo
+            sendSuccessEmail(user.getEmail(), user.getUsername(), order.getId());
+
+            log.info("Đã gửi Email hóa đơn thành công cho khách hàng: {}", user.getEmail());
+
+        } catch (Exception e) {
+            log.error("Lỗi khi xử lý gửi Email cho Đơn hàng ID {}: {}", event.getOrderId(), e.getMessage());
+        }
+    }
+
+    @KafkaListener(topics = "order-confirmed-topic", groupId = "notification-group")
+    public void handleOrderConfirmed(OrderConfirmedEvent event) {
+        log.info("Nhận tín hiệu Đơn hàng đã xác nhận thành công cho ID: {}", event.getOrderId());
 
         try {
             // 1. Lấy thông tin Đơn hàng
@@ -77,4 +99,6 @@ public class PaymentEventConsumer {
 
         brevoClient.sendEmail(brevoApiKey, request);
     }
+
+
 }

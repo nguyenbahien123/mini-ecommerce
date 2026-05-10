@@ -17,6 +17,7 @@ import vn.nbh.orderservice.entity.Order;
 import vn.nbh.orderservice.entity.OrderDetail;
 import vn.nbh.orderservice.enums.OrderStatus;
 import vn.nbh.orderservice.event.OrderCanceledEvent;
+import vn.nbh.orderservice.event.OrderConfirmedEvent;
 import vn.nbh.orderservice.event.OrderCreatedEvent;
 import vn.nbh.orderservice.exception.AppException;
 import vn.nbh.orderservice.exception.ErrorCode;
@@ -34,6 +35,7 @@ public class OrderServiceImpl implements OrderService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final OrderRepository orderRepository;
     private final ProductClient productClient;
+    private final CartServiceImpl cartService;
 
     @Override
     @Transactional
@@ -101,6 +103,9 @@ public class OrderServiceImpl implements OrderService {
         kafkaTemplate.send("order-created-topic", String.valueOf(order.getOrderId()), event);
         log.info("Đã bắn event tạo đơn hàng {} vào Kafka", order.getOrderId());
 
+        // Dọn sạch giỏ hàng trong Redis sau khi chốt đơn thành công
+        cartService.clearCart(request.getUserId());
+        log.info("Đã xóa giỏ hàng trong Redis cho User ID: {}", request.getUserId());
         return mapToResponse(order);
     }
 
@@ -134,6 +139,16 @@ public class OrderServiceImpl implements OrderService {
             order = orderRepository.save(order);
             log.info("Đã HỦY đơn hàng ID: {}. Lý do: {}", orderId, reason);
 
+            // Duyệt qua từng item trong đơn hàng và đẩy ngược lại vào giỏ hàng của User
+            for (OrderDetail detail : order.getOrderDetails()) {
+                cartService.addToCart(
+                        order.getUserId(),
+                        detail.getProductId(),
+                        detail.getQuantity()
+                );
+            }
+            log.info("Đã khôi phục giỏ hàng Redis cho User ID: {} từ Đơn hàng ID: {}", order.getUserId(), orderId);
+
             // BẮN EVENT CHUYỀN CHO PRODUCT SERVICE ĐỂ CỘNG KHO
             OrderCanceledEvent canceledEvent = OrderCanceledEvent.builder()
                     .orderId(order.getOrderId())
@@ -148,6 +163,8 @@ public class OrderServiceImpl implements OrderService {
 
             kafkaTemplate.send("order-canceled-topic", String.valueOf(order.getOrderId()), canceledEvent);
             log.info("Đã bắn tín hiệu order-canceled-topic cho Product Service để hoàn kho.");
+
+
         } else {
             log.warn("Bỏ qua yêu cầu hủy. Đơn hàng ID: {} đang ở trạng thái: {}", orderId, order.getStatus());
         }
@@ -165,7 +182,10 @@ public class OrderServiceImpl implements OrderService {
             orderRepository.save(order);
             log.info("Đã CẬP NHẬT đơn hàng ID: {} sang trạng thái CONFIRMED (Thanh toán thành công).", orderId);
 
-            // TODO: (Giai đoạn sau) Bắn Kafka báo cho Notification Service gửi Email
+            // Bắn Kafka báo cho Notification Service gửi Email
+            OrderConfirmedEvent event = new OrderConfirmedEvent(orderId);
+            kafkaTemplate.send("order-confirmed-topic", String.valueOf(orderId), event);
+            log.info("Đã bắn event (order-confirmed-topic) yêu cầu Notification Service gửi Email cho Đơn hàng ID: {}", orderId);
 
         } else {
             log.warn("Bỏ qua yêu cầu xác nhận. Đơn hàng ID: {} đang ở trạng thái: {}", orderId, order.getStatus());

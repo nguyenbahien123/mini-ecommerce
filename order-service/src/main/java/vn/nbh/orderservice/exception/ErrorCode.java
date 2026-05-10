@@ -17,6 +17,7 @@ public enum ErrorCode {
     ORDER_NOT_FOUND(1009, "Đơn hàng không tồn tại", HttpStatus.NOT_FOUND),
     PRODUCT_NOT_FOUND(1010, "Sản phẩm không tồn tại", HttpStatus.NOT_FOUND),
     INSUFFICIENT_STOCK(1011, "Sản phẩm không đủ số lượng tồn kho", HttpStatus.BAD_REQUEST),
+    SERVICE_UNAVAILABLE(1012, "Hệ thống đang quá tải, vui lòng thử lại", HttpStatusCode.valueOf(503))
     ;
 
     private final int code;

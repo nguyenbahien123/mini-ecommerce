@@ -32,6 +32,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",
             "/api/v1/users/add",
+            "/fallback/.*",
             "/api/v1/payments/webhook.*"
     );
 

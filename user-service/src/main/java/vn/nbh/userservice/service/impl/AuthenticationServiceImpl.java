@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import vn.nbh.userservice.dto.request.AuthenticationRequest;
@@ -21,7 +22,6 @@ import vn.nbh.userservice.entity.InvalidatedToken;
 import vn.nbh.userservice.entity.User;
 import vn.nbh.userservice.exception.AppException;
 import vn.nbh.userservice.exception.ErrorCode;
-import vn.nbh.userservice.repository.InvalidTokenRepository;
 import vn.nbh.userservice.repository.UserRepository;
 import vn.nbh.userservice.service.AuthenticationService;
 
@@ -31,6 +31,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.StringJoiner;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +40,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final InvalidTokenRepository invalidTokenRepository;
+    // private final InvalidTokenRepository invalidTokenRepository;
+    private final StringRedisTemplate redisTemplate; // Sử dụng Redis để lưu trữ token đã bị hủy (Blacklist) thay vì DB để tăng hiệu năng
 
     @NonFinal
     @Value("${jwt.signerKey}")
@@ -76,12 +78,25 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             var signedRefreshToken = verifyRefreshToken(logoutRequest.getRefreshToken());
 
             // Lấy JTI (JWT ID) - mã định danh duy nhất của mỗi token để lưu vào danh sách đen (Blacklist)
-            String jitAccessToken = signedAccessToken.getJWTClaimsSet().getJWTID();
-            String jitRefreshToken = signedRefreshToken.getJWTClaimsSet().getJWTID();
+            String jtiAccessToken = signedAccessToken.getJWTClaimsSet().getJWTID();
+            String jtiRefreshToken = signedRefreshToken.getJWTClaimsSet().getJWTID();
 
-            // Lưu thông tin token bị hủy vào DB để ngăn chặn việc sử dụng lại cho đến khi chúng hết hạn tự nhiên
-            invalidTokenRepository.save(InvalidatedToken.builder().id(jitAccessToken).expiryTime(signedAccessToken.getJWTClaimsSet().getExpirationTime()).build());
-            invalidTokenRepository.save(InvalidatedToken.builder().id(jitRefreshToken).expiryTime(signedRefreshToken.getJWTClaimsSet().getExpirationTime()).build());
+            // Tính toán thời gian sống CÒN LẠI của token (Tính bằng mili-giây)
+            long accessTokenExpiry = signedAccessToken.getJWTClaimsSet().getExpirationTime().getTime();
+            long refreshTokenExpiry = signedRefreshToken.getJWTClaimsSet().getExpirationTime().getTime();
+            long currentTime = new Date().getTime();
+
+            long accessTokenTTL = accessTokenExpiry - currentTime;
+            long refreshTokenTTL = refreshTokenExpiry - currentTime;
+
+            // Lưu JWT ID vào Redis với thời gian sống (TTL) chính xác bằng thời gian còn lại của Token
+            if (accessTokenTTL > 0) {
+                redisTemplate.opsForValue().set(jtiAccessToken, "logout", accessTokenTTL, TimeUnit.MILLISECONDS);
+            }
+            if (refreshTokenTTL > 0) {
+                redisTemplate.opsForValue().set(jtiRefreshToken, "logout", refreshTokenTTL, TimeUnit.MILLISECONDS);
+            }
+            log.info("Đã đưa các token vào Blacklist trong Redis thành công.");
 
         } catch (Exception e) {
             log.error("Cannot logout user", e);
@@ -153,9 +168,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
 
-        // Kiểm tra ID của token này có nằm trong bảng InvalidatedToken (đã Logout) hay không
-        if (invalidTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID()))
+        // KIỂM TRA TRONG REDIS thay vì MySQL
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(signedJWT.getJWTClaimsSet().getJWTID()))) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
 
         return signedJWT;
     }
@@ -178,8 +194,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw  new AppException(ErrorCode.UNAUTHENTICATED);
         }
 
-        if (invalidTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID()))
+        // KIỂM TRA TRONG REDIS
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(signedJWT.getJWTClaimsSet().getJWTID()))) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
 
         return signedJWT;
     }

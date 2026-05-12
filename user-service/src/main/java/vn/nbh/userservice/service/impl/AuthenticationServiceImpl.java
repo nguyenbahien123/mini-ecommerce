@@ -1,5 +1,9 @@
 package vn.nbh.userservice.service.impl;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
@@ -12,22 +16,22 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import vn.nbh.userservice.dto.request.AuthenticationRequest;
-import vn.nbh.userservice.dto.request.IntrospectRequest;
-import vn.nbh.userservice.dto.request.LogoutRequest;
-import vn.nbh.userservice.dto.request.RefreshRequest;
+import vn.nbh.userservice.dto.request.*;
 import vn.nbh.userservice.dto.response.AuthenticationResponse;
 import vn.nbh.userservice.dto.response.IntrospectResponse;
 import vn.nbh.userservice.entity.InvalidatedToken;
+import vn.nbh.userservice.entity.Role;
 import vn.nbh.userservice.entity.User;
 import vn.nbh.userservice.exception.AppException;
 import vn.nbh.userservice.exception.ErrorCode;
+import vn.nbh.userservice.repository.RoleRepository;
 import vn.nbh.userservice.repository.UserRepository;
 import vn.nbh.userservice.service.AuthenticationService;
 
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.Date;
 import java.util.StringJoiner;
 import java.util.UUID;
@@ -42,10 +46,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     // private final InvalidTokenRepository invalidTokenRepository;
     private final StringRedisTemplate redisTemplate; // Sử dụng Redis để lưu trữ token đã bị hủy (Blacklist) thay vì DB để tăng hiệu năng
+    private final RoleRepository roleRepository;
 
     @NonFinal
     @Value("${jwt.signerKey}")
     private String SIGNER_KEY; // Chìa khóa bí mật dùng để ký và xác thực tính toàn vẹn của Token
+
+    @Value("${outbound.identity.google.client-id}")
+    private String GOOGLE_CLIENT_ID; // Client ID của ứng dụng trên Google để xác thực token từ Google
 
     @Override
     public AuthenticationResponse authenticate(AuthenticationRequest authenticationRequest) {
@@ -141,6 +149,60 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         return IntrospectResponse.builder()
                 .isValid(isValid)
                 .build();
+    }
+
+    @Override
+    public AuthenticationResponse googleAuthenticate(GoogleLoginRequest request) {
+        try {
+            // 1. Khởi tạo bộ xác thực của Google
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(GOOGLE_CLIENT_ID))
+                    .build();
+
+            // 2. Xác thực tính hợp lệ của token do Frontend gửi lên
+            GoogleIdToken idToken = verifier.verify(request.getIdToken());
+
+            if (idToken == null) {
+                log.error("Google Token không hợp lệ hoặc đã hết hạn");
+                throw new AppException(ErrorCode.INVALID_TOKEN); // Bắn lỗi JWT của hệ thống
+            }
+
+            // 3. Trích xuất thông tin người dùng từ Google
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            String name = (String) payload.get("name");
+            // String pictureUrl = (String) payload.get("picture"); // Có thể dùng nếu DB bạn có cột avatar
+
+            // 4. Kiểm tra user trong DB. Nếu chưa có -> Tự động đăng ký (Auto Register)
+            User user = userRepository.findByEmail(email).orElseGet(() -> {
+                log.info("Tạo mới tài khoản cho user đăng nhập từ Google: {}", email);
+                User newUser = User.builder()
+                        .email(email)
+                        .username(name)
+                        // Gen một password ngẫu nhiên siêu khó để không ai login bằng form thường được
+                        .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
+                        .build();
+                Role defaultRole = roleRepository.findByName("USER").orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_EXISTED));
+
+                newUser.setRoles(defaultRole); // Gán role mặc định nếu cần (ví dụ: ROLE_USER)
+
+                return userRepository.save(newUser);
+            });
+
+            // 5. Khởi tạo Token của hệ thống (Tái sử dụng code cực kỳ DRY)
+            String accessToken = generateAccessToken(user);
+            String refreshToken = generateRefreshToken(user);
+
+            return AuthenticationResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .authenticated(true)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Lỗi khi xác thực Google Login: ", e);
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
     }
 
     /**

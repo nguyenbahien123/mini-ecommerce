@@ -28,6 +28,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     private final List<String> publicEndpoints = List.of(
             "/api/v1/auth/token",
+            "/api/v1/auth/google",
             "/api/v1/auth/introspect",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",

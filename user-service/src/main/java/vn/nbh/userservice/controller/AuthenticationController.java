@@ -3,6 +3,7 @@ package vn.nbh.userservice.controller;
 import com.nimbusds.jose.JOSEException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -11,10 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import vn.nbh.userservice.dto.request.AuthenticationRequest;
-import vn.nbh.userservice.dto.request.IntrospectRequest;
-import vn.nbh.userservice.dto.request.LogoutRequest;
-import vn.nbh.userservice.dto.request.RefreshRequest;
+import vn.nbh.userservice.dto.request.*;
 import vn.nbh.userservice.dto.response.ApiResponse;
 import vn.nbh.userservice.dto.response.AuthenticationResponse;
 import vn.nbh.userservice.dto.response.IntrospectResponse;
@@ -63,4 +61,13 @@ public class AuthenticationController {
         return ApiResponse.<Void>builder().build();
     }
 
+    @Operation(summary = "Đăng nhập bằng Google", description = "Sử dụng Google ID Token để đăng nhập và nhận Access Token/Refresh Token")
+    @PostMapping("/google")
+    public ApiResponse<AuthenticationResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+        var result = authenticationService.googleAuthenticate(request);
+        return ApiResponse.<AuthenticationResponse>builder()
+                .message("Đăng nhập Google thành công")
+                .result(result)
+                .build();
+    }
 }

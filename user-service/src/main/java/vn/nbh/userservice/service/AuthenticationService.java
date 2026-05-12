@@ -1,10 +1,7 @@
 package vn.nbh.userservice.service;
 
 import com.nimbusds.jose.JOSEException;
-import vn.nbh.userservice.dto.request.AuthenticationRequest;
-import vn.nbh.userservice.dto.request.IntrospectRequest;
-import vn.nbh.userservice.dto.request.LogoutRequest;
-import vn.nbh.userservice.dto.request.RefreshRequest;
+import vn.nbh.userservice.dto.request.*;
 import vn.nbh.userservice.dto.response.AuthenticationResponse;
 import vn.nbh.userservice.dto.response.IntrospectResponse;
 
@@ -15,4 +12,5 @@ public interface AuthenticationService  {
     void logout(LogoutRequest logoutRequest);
     AuthenticationResponse refreshToken(RefreshRequest refreshRequest) throws ParseException, JOSEException;
     IntrospectResponse introspect(IntrospectRequest introspectRequest);
+    AuthenticationResponse googleAuthenticate(GoogleLoginRequest request);
 }

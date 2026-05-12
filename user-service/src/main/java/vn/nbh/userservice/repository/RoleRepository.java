@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import vn.nbh.userservice.entity.Role;
 
+import java.util.Optional;
+
 @Repository
 public interface RoleRepository extends JpaRepository<Role, String> {
     @Query("""
@@ -19,4 +21,6 @@ public interface RoleRepository extends JpaRepository<Role, String> {
     )
 """)
     Page<Role> searchByKeyword(String keyword, Pageable pageable);
+
+    Optional<Role> findByName(String user);
 }
